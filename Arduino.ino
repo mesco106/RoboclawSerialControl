@@ -9,10 +9,13 @@ Gpio led(LED_BUILTIN);
 RoboClaw roboclaw(&Serial2, 10000);
 
 #define address 0x80
-#define Kp 1.0
-#define Ki 0.5
-#define Kd 0.25
-#define qpps 44000
+
+#define Kp 3.20934
+#define Ki 0.29864
+#define Kd 0.0
+
+#define qpps1 9750
+#define qpps2 9187
 
 void setup() {
   roboclaw.begin(38400);
@@ -20,8 +23,8 @@ void setup() {
   led.setup();
 
   //Set PID Coefficients
-  roboclaw.SetM1VelocityPID(address,Kd,Kp,Ki,qpps);
-  roboclaw.SetM2VelocityPID(address,Kd,Kp,Ki,qpps); 
+  roboclaw.SetM1VelocityPID(address,Kd,Kp,Ki,qpps1);
+  roboclaw.SetM2VelocityPID(address,Kd,Kp,Ki,qpps2); 
 }
 
 void loop() {
@@ -30,8 +33,11 @@ void loop() {
 }
 
 void run(const String &message) {
+  float radius = 40.0;
+  float *radiusAddress = &radius;
+  
   auto action = command(message);
-
+  
   if (action == "halt") {
     move(0, 0);
 
@@ -91,14 +97,12 @@ void run(const String &message) {
     if (param == "-e1" || param == "--encoder1") {
       int32_t value = argument(message, 2);
       roboclaw.SetEncM1(address, value);
-      port.send("Encoder 1 setup to: ");
-      port.send(value);
+      port.send("Encoder 1 setup to: " + String(value));
 
     } else if (param == "-e2" || param == "--encoder2") {
       int32_t value = argument(message, 2);
       roboclaw.SetEncM2(address, value);
-      port.send("Encoder 2 setup to: ");
-      port.send(value);
+      port.send("Encoder 2 setup to: " + String(value));
 
     } else if (param == "-es" || param == "--encoders") {
       String confirmation = argumentString(message, 2);
@@ -106,7 +110,13 @@ void run(const String &message) {
         roboclaw.ResetEncoders(address);
         port.send("Encoders reseted!");
       }
+
+    } else if (param == "-ra" || param == "--radius"){
+      *radiusAddress = argument(message, 2);
+      port.send("Radius setup to: " + String(*radiusAddress));
     }
+
+  
 
     /*__________________________READ COMMAND_________________________________*/
 
@@ -114,30 +124,29 @@ void run(const String &message) {
     String param = argumentString(message, 1);
 
     if (param == "-e1" || param == "--encoder1") {
-      port.send("Encoder 1: ");
-      port.send(roboclaw.ReadEncM1(address));
+      port.send("Encoder 1: " + String(roboclaw.ReadEncM1(address)));
 
     } else if (param == "-e2" || param == "--encoder2") {
-      port.send("Encoder 2: ");
-      port.send(roboclaw.ReadEncM2(address));
+      port.send("Encoder 2: " + String(roboclaw.ReadEncM2(address)));
+
     } else if (param == "-es" || param == "--encoders") {
-      port.send("Encoder 1: ");
-      port.send(roboclaw.ReadEncM1(address));
-      port.send("Encoder 2: ");
-      port.send(roboclaw.ReadEncM2(address));
+      port.send("Encoder 1: " + String(roboclaw.ReadEncM1(address)));
+      port.send("Encoder 2: " + String(roboclaw.ReadEncM2(address)));
 
     } else if (param == "-t" || param == "--temperature") {
       uint16_t temp;
       roboclaw.ReadTemp(address, temp);
-      port.send(temp);
+      temp = (1.8)*(temp - 273.15) + 32;
+      port.send("temperature 1 is: " + String(temp) + " F");
 
     } else if (param == "-t2" || param == "--temperature2") {
       uint16_t temp2;
       roboclaw.ReadTemp2(address, temp2);
-      port.send(temp2);
+      temp2 = (1.8)*(temp2 - 273.15) + 32;
+      port.send("temperature 2 is: " + String(temp2) + " F");
 
     } else if (param == "-b" || param == "--battery") {
-      port.send(roboclaw.ReadMainBatteryVoltage(address));
+      port.send("Battery: " + String(roboclaw.ReadMainBatteryVoltage(address)));
 
     } else if (param == "-v" || param == "--version") {
       char version[32];
@@ -146,19 +155,19 @@ void run(const String &message) {
       }
 
     } else if (param == "-s1" || param == "--speed1") {
-      port.send("Speed M1: ");
-      port.send(roboclaw.ReadSpeedM1(address));
+      port.send("Speed M1: " + String(roboclaw.ReadSpeedM1(address)));
 
     } else if (param == "-s2" || param == "--speed2") {
-      port.send("Speed M2: ");
-      port.send(roboclaw.ReadSpeedM2(address));
+      port.send("Speed M2: " + String(roboclaw.ReadSpeedM2(address)));
 
     } else if (param == "-ss" || param == "--speeds") {
-      port.send("Speed M1: ");
-      port.send(roboclaw.ReadSpeedM1(address));
-      port.send("Speed M2: ");
-      port.send(roboclaw.ReadSpeedM2(address));
+      port.send("Speed M1: " + String(roboclaw.ReadSpeedM1(address)));
+      port.send("Speed M2: " + String(roboclaw.ReadSpeedM2(address)));
+
+    } else if (param == "-r" || param == "--radius") {
+      port.send("radius is set to: " + String(*radiusAddress));
     }
+
   } else {
     /*__________________________ERROR COMMANDS_______________________________*/
     port.send("Ops, '" + message + "' command not found!");
@@ -209,6 +218,7 @@ void backward(String Motor, int speed) {
     port.send("Motor " + Motor + " at speed of: " + speed);
   }
 }
+
 
 void right(float speed) {
   port.send("turning left");
